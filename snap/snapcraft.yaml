@@ -59,9 +59,11 @@ parts:
     # with stable.
     rust-channel: stable
     rust-path: [llmfit-tui]
-    build-snaps:
+    build-packages:
       # The web dashboard embedded by `llmfit serve` is a Vite/React app.
-      - node/22/stable
+      # Archive Node (22.x) rather than the node snap, which has no riscv64.
+      - nodejs
+      - npm
     stage-packages:
       # lspci names GPUs when nvidia-smi / rocm-smi (host-only) are absent.
       - pciutils
