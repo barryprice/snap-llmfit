@@ -73,7 +73,7 @@ parts:
       # Pinned upstream release tag. Renovate bumps this line automatically
       # when AlexsJones/llmfit publishes a new release (see renovate.json).
       # renovate: datasource=github-releases depName=AlexsJones/llmfit
-      llmfit_version="v1.1.18"
+      llmfit_version="v1.1.20"
 
       # Shallow-fetch exactly the pinned tag, then build that release.
       git fetch --depth 1 --force origin tag "${llmfit_version}"
