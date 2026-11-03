@@ -1,0 +1,104 @@
+name: llmfit-bp
+title: llmfit
+base: core26
+adopt-info: llmfit
+license: MIT
+summary: find which LLMs your hardware can actually run
+description: |
+  llmfit right-sizes Large Language Models to your system's RAM, CPU and GPU.
+
+  It detects your hardware, scores hundreds of models across quality, speed,
+  fit and context dimensions, and tells you which ones will actually run well
+  on your machine. It ships with an interactive TUI (default), a classic CLI,
+  and a web dashboard / REST API (`llmfit serve`), and talks to local runtime
+  providers such as Ollama, LM Studio, vLLM and Docker Model Runner.
+
+  For a convenient alias:
+
+  sudo snap alias llmfit-bp.llmfit llmfit
+
+  To let llmfit detect your GPUs (PCI devices and VRAM via sysfs):
+
+  sudo snap connect llmfit-bp:hardware-observe
+
+contact:
+  - https://github.com/barryprice
+issues:
+  - https://github.com/barryprice/snap-llmfit/issues
+source-code:
+  - https://github.com/AlexsJones/llmfit
+website:
+  - https://llmfit.axjns.dev/
+grade: stable
+confinement: strict
+
+layout:
+  # lspci (staged below) looks up GPU names in its compiled-in ids path.
+  /usr/share/misc/pci.ids:
+    bind-file: $SNAP/usr/share/misc/pci.ids
+
+apps:
+  llmfit:
+    command: bin/llmfit
+    environment:
+      # Keep downloaded models (~/.cache/llmfit/models) out of the
+      # per-revision $HOME so they aren't copied on every refresh.
+      # LLMFIT_MODELS_DIR still takes precedence.
+      XDG_CACHE_HOME: $SNAP_USER_COMMON/.cache
+    plugs: [home, network, network-bind, hardware-observe]
+
+parts:
+  llmfit:
+    plugin: rust
+    source: https://github.com/AlexsJones/llmfit.git
+    source-type: git
+    # Only the pinned tag is fetched below.
+    source-depth: 1
+    # Force a rustup-managed toolchain: upstream needs rustc >= 1.95 (sysinfo
+    # MSRV), newer than the archive's rustc. Upstream releases also build
+    # with stable.
+    rust-channel: stable
+    rust-path: [llmfit-tui]
+    build-snaps:
+      # The web dashboard embedded by `llmfit serve` is a Vite/React app.
+      - node/22/stable
+    stage-packages:
+      # lspci names GPUs when nvidia-smi / rocm-smi (host-only) are absent.
+      - pciutils
+    override-pull: |
+      craftctl default
+
+      # Pinned upstream release tag. Renovate bumps this line automatically
+      # when AlexsJones/llmfit publishes a new release (see renovate.json).
+      # renovate: datasource=github-releases depName=AlexsJones/llmfit
+      llmfit_version="v1.1.18"
+
+      # Shallow-fetch exactly the pinned tag, then build that release.
+      git fetch --depth 1 --force origin tag "${llmfit_version}"
+      git checkout --detach "${llmfit_version}"
+    override-build: |
+      # Build the web dashboard first, as upstream's release workflow does;
+      # without llmfit-web/dist the binary embeds a placeholder page.
+      (cd llmfit-web && npm ci && npm run build)
+
+      craftctl default
+
+      # Safety gate: run the freshly built binary so we never package a snap
+      # whose binary doesn't execute and report a version. Output is
+      # "llmfit <version>"; derive the snap version from it.
+      version_output="$("${CRAFT_PART_INSTALL}/bin/llmfit" --version)" || {
+        echo "llmfit --version failed" >&2
+        exit 1
+      }
+      snap_version="${version_output#llmfit }"
+      [ -n "${snap_version}" ] && [ "${snap_version}" != "${version_output}" ] || {
+        echo "llmfit --version produced no parsable version: ${version_output}" >&2
+        exit 1
+      }
+      craftctl set version="${snap_version#v}"
+    prime:
+      - bin/llmfit
+      - usr/bin/lspci
+      - usr/lib
+      - usr/share/misc/pci.ids
+      - usr/share/doc/*/copyright
