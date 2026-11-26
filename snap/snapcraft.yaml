@@ -81,7 +81,22 @@ parts:
     override-build: |
       # Build the web dashboard first, as upstream's release workflow does;
       # without llmfit-web/dist the binary embeds a placeholder page.
-      (cd llmfit-web && npm ci && npm run build)
+      # npm ci is retried (it starts from a clean node_modules each time)
+      # because flaky networks, notably on riscv64 builders, break it.
+      (
+        cd llmfit-web
+        attempt=1
+        until npm ci; do
+          if [ "${attempt}" -ge 5 ]; then
+            echo "npm ci failed after ${attempt} attempts" >&2
+            exit 1
+          fi
+          attempt=$((attempt + 1))
+          echo "npm ci failed, retrying in 30s (attempt ${attempt}/5)" >&2
+          sleep 30
+        done
+        npm run build
+      )
 
       craftctl default
 
