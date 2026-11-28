@@ -31,6 +31,13 @@ website:
   - https://llmfit.axjns.dev/
 grade: stable
 confinement: strict
+platforms:
+  amd64:
+  arm64:
+  armhf:
+  ppc64el:
+  riscv64:
+  s390x:
 
 layout:
   # lspci (staged below) looks up GPU names in its compiled-in ids path.
